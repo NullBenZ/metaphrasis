@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-graph-fortran-devito"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["scikit-learn", "numpy", "fparser"]
+
+[project.optional-dependencies]
+test = ["pytest", "matplotlib", "leidenalg", "igraph"]
+
+[project.scripts]
+metagraph-ingest = "metagraph.ingest:main"
+metagraph-vectors = "metagraph.vectors:main"
+metagraph-retrieve = "metagraph.retrieval:main"
+metagraph-eval = "metagraph.eval_retrieval:main"
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+
+[tool.setuptools.packages.find]
+where = ["python"]
+
+[tool.pytest.ini_options]
+pythonpath = ["python"]
+testpaths = ["tests"]
