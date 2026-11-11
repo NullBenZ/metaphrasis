@@ -45,6 +45,13 @@ def _read_python(path, rel):
                 if base_name:
                     edges.append((cid,"symbol:"+base_name,"INHERITS"))
                     entities.append(("symbol:"+base_name,base_name,"base",cid))
+    for node in ast.walk(tree):
+        if isinstance(node,ast.Attribute):
+            entities.append(("symbol:"+node.attr,node.attr,"attribute",module_id))
+        elif isinstance(node,ast.ImportFrom):
+            for alias in node.names:
+                local=alias.asname or alias.name
+                entities.append(("symbol:"+local,local,"imported_name",module_id))
     return rows,edges,entities
 
 
@@ -67,7 +74,7 @@ def _read_doc(path, rel):
     return rows,edges,[]
 
 
-def build_index(root, database):
+def build_index(root, database, allowed_names=None):
     root=Path(root).resolve(); database=Path(database)
     candidates=sorted(p for p in root.rglob("*") if p.is_file() and not any(x in {".git",".venv","venv","__pycache__"} for x in p.parts))
     records=[]; relations=[]; entity_records=[]
@@ -94,11 +101,16 @@ def build_index(root, database):
         con.executemany("INSERT INTO chunks_fts(id,path,kind,name,text) VALUES(?,?,?,?,?)",records)
         con.commit()
     finally: con.close()
+    if allowed_names is not None:
+        with sqlite3.connect(database) as con:
+            names=[r[0] for r in con.execute("SELECT DISTINCT name FROM entities ORDER BY name")]
+        allowed_names=Path(allowed_names);allowed_names.parent.mkdir(parents=True,exist_ok=True)
+        allowed_names.write_text("".join(name+"\n" for name in names),encoding="utf-8")
     return len(records)
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root",required=True);parser.add_argument("--database",required=True)
-    args=parser.parse_args(); print(f"indexed_chunks={build_index(args.root,args.database)}")
+    parser.add_argument("--root",required=True);parser.add_argument("--database",required=True);parser.add_argument("--allowed-names")
+    args=parser.parse_args(); print(f"indexed_chunks={build_index(args.root,args.database,args.allowed_names)}")
 if __name__=="__main__":main()

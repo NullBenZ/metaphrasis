@@ -15,5 +15,8 @@ class VectorCases(unittest.TestCase):
             export_vectors(db,out); first=out.read_text();export_vectors(db,out)
             self.assertEqual(first,out.read_text());self.assertEqual(len(first.splitlines()),3)
             self.assertIn('a\t',first)
+            for line in first.splitlines():
+                indices=[int(token.split(':')[0]) for token in line.split('\t')[1].split()]
+                self.assertEqual(indices,sorted(set(indices)))
 
 if __name__=='__main__':unittest.main()

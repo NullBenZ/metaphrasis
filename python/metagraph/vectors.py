@@ -1,6 +1,7 @@
 """Fit deterministic L2-normalized TF-IDF vectors and export the .sv format."""
 import argparse
 import sqlite3
+import numpy as np
 from pathlib import Path
 
 
@@ -15,8 +16,8 @@ def export_vectors(database, output):
     target=Path(output);target.parent.mkdir(parents=True,exist_ok=True)
     if not docs:
         target.write_text("",encoding="utf-8");return 0
-    vec=TfidfVectorizer(norm="l2",dtype="float64",token_pattern=r"(?u)\b\w+\b")
-    try: matrix=vec.fit_transform(docs).tocsr()
+    vec=TfidfVectorizer(norm="l2",dtype=np.float64,token_pattern=r"(?u)\b\w+\b")
+    try: matrix=vec.fit_transform(docs).tocsr();matrix.sort_indices()
     except ValueError as exc:
         if "empty vocabulary" not in str(exc): raise
         target.write_text("".join(f"{doc_id}\t\n" for doc_id in ids),encoding="utf-8");return len(ids)

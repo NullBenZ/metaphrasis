@@ -1,36 +1,43 @@
-# Project plan
+# Project plan and verified status
 
-## Understanding of the specification
+## Understanding and assumptions
 
-Build a local, deterministic pipeline for indexing Devito source and documentation, creating TF-IDF vectors, sparsifying them with a hand-written exact top-K algorithm, finding connected Leiden communities with hand-written Louvain/Leiden steps, and retrieving source idioms. A rule-based Fortran analyzer recognizes only the five specified finite-difference patterns. A template emitter uses API names extracted from the indexed repository and validates emitted Python with `ast`; numerical validation compares outputs from compiled Fortran and Devito. Experiments report only measurements produced by actual runs.
+Build a deterministic local pipeline: index Python and docs from a pinned Devito checkout into SQLite/FTS5; export normalized TF-IDF; build an exact, hand-written C++ top-K CSR graph; run hand-written Louvain plus Leiden refinement; retrieve with four configured modes; conservatively parse five Fortran stencil patterns; emit templates whose Devito identifiers are checked against the indexed source; and compare generated output with compiled Fortran. Benchmarks report measurements from the current machine and clearly identify synthetic inputs.
 
-## Assumptions
+- The `.sv` format is one row per chunk ID with sorted `feature:weight` pairs. Empty rows represent zero vectors.
+- Cosine weights are exact sparse dot products; nonpositive scores are omitted. Stable ID ordering resolves ties. Union symmetrization is default; `--mutual` and `--dense` are explicit modes.
+- Unsupported Fortran returns a path, line, and reason. The emitter rejects non-zero-based arrays and unsupported metadata rather than guessing.
+- Devito API allow-list names and idiom source paths are read from the indexed checkout.
+- The numeric comparison uses `numpy.allclose`; the five fixture runs use `atol=rtol=2e-6` to allow for the Fortran fixtures' single precision.
+- All generated/test outputs stay local. The user asked to be consulted before any GitHub update; none has been made.
 
-- The input vector file is documented sparse text: one row per document, `document_id<TAB>feature_index:weight ...`; IDs are unique and features are L2-normalized by the vector stage.
-- Similarities are exact sparse cosine/dot products. Zero-vector similarities are zero. Ties are resolved by ascending document ID for repeatability.
-- The top-K graph uses undirected union by default; `--mutual` keeps an edge only when both endpoints select each other. `--dense` ignores K and retains all positive similarities.
-- Graph files use a documented edge-list text format. The C++ implementation owns CSR storage and graph algorithms.
-- Unsupported or ambiguous Fortran is reported with a source location; no fallback translation is attempted.
-- Any repository commit pin, indexed API allow-list, benchmark value, or validation result must come from an actual local checkout/run. None will be fabricated.
+## Environment and inputs
 
-## Environment and current blockers (2026-11-09)
+The current environment has GCC/G++, CMake, Git, Python 3.14 in `.venv`, gfortran, and required Python packages. Devito is cloned at `/home/shakti/devito`, commit `00e78a59c640deb8ecbf1af5125d99abb40f5a20`. The checkout is indexed in `data/devito.sqlite`; the allowed-name file is `data/devito.allowed_names`. Python commands below use `.venv/bin/python` and `PYTHONPATH=python:/home/shakti/devito` for generated scripts.
 
-Available: GCC/G++ 16.2.1, CMake 4.4.5, Git 2.56.0, SQLite FTS5.
-Available Python is 3.14.9 (meets the 3.11+ requirement). Missing: gfortran, Devito, scikit-learn, pytest, matplotlib, fparser, NumPy, leidenalg, igraph.
-The workspace has no Git repository metadata (`.git` is an empty, read-only directory), so commits cannot be created here. Network DNS is unavailable, so the requested pinned Devito clone cannot be fetched or pinned. Those limitations prevent a completed environment setup, actual Devito API inventory, Python pipeline installation, reference Leiden checks, and numeric Fortran/Devito validation.
+The workspace `.git` metadata is available to read. The workspace contains uncommitted project files; remote GitHub has not been updated. The latest tests pass (see final recorded run below).
 
-## Phases
+## Phase status
 
-Follow the user-provided phase order and tests-first requirement. Preserve hand-written top-K and Leiden as the DAA core. If dependencies or source inputs are unavailable, keep interfaces and plain-file formats runnable where possible, and report the exact unmet validation. Do not claim project completion until all stated DONE conditions have actually been met.
+0. **Setup:** verified compiler/tool availability, recorded the Devito commit, and documented assumptions here.
+1. **Ingest:** Python AST and Markdown/RST/text chunking, entity/edge extraction, SQLite tables, and FTS5. Indexed Devito: 7,958 chunks and 48,851 edges.
+2. **Vectors:** scikit-learn TF-IDF, L2 normalization, deterministic row order, sparse `.sv` export. 7,958 rows exported.
+3. **Top-K:** hand-written exact sparse cosine with bounded min-heaps and worker parallelism, CSR, union/mutual/dense output. Devito top-K graph has 7,958 nodes and 47,965 edges.
+4. **Leiden:** hand-written local moving, aggregation, constrained connected refinement, resolution and seed controls, modularity. Reference comparison: 100 graph-resolution cases across 20 fixed random/planted graphs, maximum absolute normalized quality difference 0.0262827; every resulting community connected. C++ hand tests pass.
+5. **Retrieval:** BM25, exact text, MENTIONS expansion, and graph neighbors; community pre-screen toggle; weighted merge and top-15. Eval supports Precision@5, Recall@5 and MRR. `data/queries.jsonl` has 20 Devito-doc-derived DRAFT queries with empty relevance labels for review.
+6. **Fortran analysis:** fparser recognizes the five requested stencil families using expression structure, offsets, loop bounds, coefficients and boundaries. Unsupported samples produce reasons. Unit tests pass.
+7. **Emitter:** implemented templates for all five patterns. Each cites a Python file from the indexed Devito checkout. Generated Python passes AST allow-list validation.
+8. **Numeric validation:** gfortran compiles and runs each fixture; generated Devito scripts run locally; arrays compare successfully. Current table is reproducible with `metagraph.validate_samples` and appears in `bench/results/conversion_validation.csv`.
+9. **Benchmarks:** synthetic dense-vs-top-K, K, resolution, pre-screen, thread-scaling and retrieval measurements are saved as CSV/PNG with machine specs and fitted slopes. The benchmark CLI can also measure the five real conversion fixtures when passed the indexed DB and allow-list. No interpretation or unsupported speedup claim is made.
+10. **Docs:** README, sparse formats, and module walkthrough are maintained in `README.md`, `docs/formats.md`, and `docs/EXPLAIN.md`.
 
-## Implemented work and validation
+## Latest verification
 
-- Phase 0: environment inspected and blockers recorded above. Devito clone/hash and commits are unavailable because of DNS and the read-only empty `.git` directory.
-- Phase 1: generic AST/document chunking, SQLite FTS5, chunk edges, and symbol entities implemented. Ingestion smoke test passes. It has not been run over Devito because that source is not present.
-- Phase 2: scikit-learn TF-IDF exporter and `.sv` writer implemented. Its test is skipped because scikit-learn is not installed.
-- Phase 3: exact top-K, deterministic tie handling, threaded per-node work, union/mutual/dense output, plus hand tests implemented. CMake/CTest passes.
-- Phase 4: CSR, modularity, seeded local moving, connectivity refinement, and community aggregation implemented. Hand modularity/planted graph tests pass. Comparison to `leidenalg` remains unverified because the reference packages are not installed; full algorithmic equivalence is not claimed.
-- Phase 5: BM25, exact, MENTIONS, and graph-neighbor retrieval with community pre-screening and an evaluation harness implemented. Retrieval and metric tests pass. Draft queries were not generated because the Devito docs were not available, and relevance labels were not invented.
-- Phases 6–10 are not implemented. Numeric conversion and benchmarks cannot be reported without the indexed Devito checkout, gfortran, and runtime dependencies.
+Run from the project root:
 
-No phase commits could be created: `.git` exists as an empty read-only directory, and `git status` reports that the workspace is not a Git repository.
+```sh
+GRAPH_TOOL=/tmp/metaphrasis-build/graph_tool PYTHONPATH=python:/home/shakti/devito DEVITO_JIT_DIR=/tmp/metaphrasis-devito-jit .venv/bin/python -m pytest -q
+ctest --test-dir /tmp/metaphrasis-build --output-on-failure
+```
+
+Observed result: 12 pytest tests passed with 15 subtests; CTest passed 2/2. Five numeric conversions passed (max absolute errors: advection 0, heat 1D 1.86265e-09, heat 2D 5.96046e-08, Jacobi Poisson 0, wave 3.72529e-09). Do not treat this as verification of arbitrary legacy Fortran; only the recognized subset is supported.

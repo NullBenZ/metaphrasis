@@ -16,6 +16,11 @@ metagraph-ingest = "metagraph.ingest:main"
 metagraph-vectors = "metagraph.vectors:main"
 metagraph-retrieve = "metagraph.retrieval:main"
 metagraph-eval = "metagraph.eval_retrieval:main"
+metagraph-fortran = "metagraph.fortran_analysis:main"
+metagraph-emit = "metagraph.emitter:main"
+metagraph-validate = "metagraph.validate_numeric:main"
+metagraph-validate-samples = "metagraph.validate_samples:main"
+metagraph-api-check = "metagraph.api_validation:main"
 
 [tool.setuptools]
 package-dir = {"" = "python"}

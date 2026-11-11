@@ -10,6 +10,12 @@ int main(){
     WeightedEdges e{{0,1,1},{1,2,1},{0,2,1},{3,4,1},{4,5,1},{3,5,1},{2,3,.1}};
     CSRGraph g(6,e);
     assert(std::abs(modularity(g,{0,0,0,1,1,1},1.0)-0.4836065573770492)<1e-12);
+    auto refined=refine_partition(g,{0,0,0,1,1,1},1.0,7);
+    assert(connected_communities(g,refined));
+    assert(refined[0]==refined[1] && refined[1]==refined[2]);
+    assert(refined[3]==refined[4] && refined[4]==refined[5] && refined[0]!=refined[3]);
+    for(std::size_t i=0;i<refined.size();++i) for(std::size_t j=0;j<refined.size();++j)
+        if(refined[i]==refined[j]) assert((i<3)==(j<3));
     auto c=leiden(g,1.0,7);
     assert(connected_communities(g,c));
     assert(c[0]==c[1] && c[1]==c[2]);

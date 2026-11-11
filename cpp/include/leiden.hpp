@@ -16,6 +16,7 @@ private:
     std::size_t n_; std::vector<std::size_t> offsets_,neighbors_; std::vector<double> weights_,degree_;
 };
 double modularity(const CSRGraph&, const std::vector<std::size_t>& communities, double resolution);
+std::vector<std::size_t> refine_partition(const CSRGraph&, const std::vector<std::size_t>& parent, double resolution, unsigned seed);
 std::vector<std::size_t> leiden(const CSRGraph&, double resolution, unsigned seed);
 bool connected_communities(const CSRGraph&, const std::vector<std::size_t>& communities);
 }

@@ -1,32 +1,48 @@
 # Local graph-based Fortran-to-Devito converter
 
-A deterministic, local university DAA project. The intended pipeline indexes Devito Python source and documentation, exports TF-IDF vectors, builds an exact top-K similarity graph, detects connected communities, retrieves idioms, recognizes five fixed Fortran stencils, emits Devito templates, and compares generated results with compiled Fortran.
+A deterministic, local DAA project. It indexes a pinned Devito checkout, builds TF-IDF vectors and a hand-written exact top-K CSR graph, detects communities with hand-written Louvain/Leiden, retrieves Devito idioms, converts five recognized Fortran finite-difference patterns, and numerically validates the generated script against gfortran output. It uses no LLM or runtime service.
 
-## Current implementation status
+## Install and run
 
-The C++ top-K and community stages are implemented with hand-written algorithms and hand-checkable tests. Python AST/document ingestion and the scikit-learn TF-IDF exporter are implemented. The repository ingestion, retrieval, Fortran analysis, Devito emitter, numeric harness, evaluation harness, and benchmark suite are not complete. The pinned Devito checkout could not be fetched in this environment, so no API allow-list or conversion result is claimed. See [PLAN.md](PLAN.md).
-
-## Build and run the implemented graph stages
-
-Requirements for the graph stages: C++17 compiler and CMake.
+Python 3.11+, a C++17 compiler, CMake, gfortran, and Git are required. These three commands install dependencies, fetch the recorded Devito revision, build the graph tool, index Devito, run retrieval inputs, and validate all five Fortran fixtures:
 
 ```sh
-cmake -S cpp -B build && cmake --build build
-./build/graph_tool --input tests/fixtures/tiny.sv --output /tmp/graph.edges --k 1 --threads 2
-./build/graph_tool --mode leiden --input /tmp/graph.edges --output /tmp/communities.tsv --nodes 4 --resolution 1.0 --seed 1
+.venv/bin/python -m venv .venv && .venv/bin/python -m pip install -e '.[test]'
+./scripts/clone_devito.sh --destination data/devito && cmake -S cpp -B build && cmake --build build
+PYTHONPATH=python:data/devito .venv/bin/python -m metagraph.ingest --root data/devito --database data/devito.sqlite --allowed-names data/devito.allowed_names && PYTHONPATH=python .venv/bin/python -m metagraph.vectors --database data/devito.sqlite --output data/devito.sv && build/graph_tool --input data/devito.sv --output data/devito.edges --k 8 --threads 4 && build/graph_tool --mode leiden --input data/devito.edges --output data/devito.communities.tsv --nodes "$(wc -l < data/devito.sv)" --resolution 1.0 --seed 1 && PYTHONPATH=python:data/devito .venv/bin/python -m metagraph.validate_samples --database data/devito.sqlite --allowed-names data/devito.allowed_names --samples fortran_samples --csv bench/results/conversion_validation.csv
 ```
 
-Use the actual number of rows in `vectors.sv` for `--nodes`. The first command builds the C++ tool; the next two run top-K and community detection. See [docs/formats.md](docs/formats.md) for the plain-text formats.
+The clone script checks out `DEVITO_COMMIT`. If Devito is already cloned elsewhere, skip the clone command and point `PYTHONPATH` to that checkout; `scripts/clone_devito.sh` accepts `--destination`. Run `PYTHONPATH=python:/path/to/devito` for validation so the generated child process can import Devito.
 
-## Python stages
-
-Python must be 3.11 or newer. Install project dependencies with `python -m pip install -r requirements.txt`. Index a repository with:
+To create communities after graph generation, use the graph node count (the number of rows in `.sv`):
 
 ```sh
-PYTHONPATH=python python -m metagraph.ingest --root /path/to/repository --database data/index.sqlite
-PYTHONPATH=python python -m metagraph.vectors --database data/index.sqlite --output data/vectors.sv
+build/graph_tool --mode leiden --input data/devito.edges --output data/devito.communities.tsv --nodes "$(wc -l < data/devito.sv)" --resolution 1.0 --seed 1
 ```
 
-## Tests
+Emit and validate one sample with:
 
-Run C++ tests with `ctest --test-dir build --output-on-failure`. Run Python tests with `PYTHONPATH=python python -m pytest`. Tests do not download data or use a network service.
+```sh
+PYTHONPATH=python .venv/bin/python -m metagraph.emitter fortran_samples/heat1d.f90 --database data/devito.sqlite --allowed-names data/devito.allowed_names --output /tmp/heat1d.py
+```
+
+## Retrieval and evaluation
+
+The four retrieval modes are BM25, exact text, `MENTIONS` expansion, and top-K similarity. Weighted scores are configurable; community pre-screening is optional. Twenty draft queries from the indexed Devito documentation are in `data/queries.jsonl`. They are marked `DRAFT` and contain empty relevance lists: review and fill those labels before interpreting metrics.
+
+```sh
+PYTHONPATH=python .venv/bin/python -m metagraph.retrieval --database data/devito.sqlite --query 'time stepping wavefield arrays' --communities data/devito.communities.tsv --graph data/devito.edges
+PYTHONPATH=python .venv/bin/python -m metagraph.eval_retrieval --database data/devito.sqlite --queries data/queries.jsonl --communities data/devito.communities.tsv --graph data/devito.edges
+```
+
+## Tests and experiments
+
+```sh
+GRAPH_TOOL=build/graph_tool PYTHONPATH=python:/path/to/devito .venv/bin/python -m pytest -q
+ctest --test-dir build --output-on-failure
+PYTHONPATH=python .venv/bin/python bench/run_benchmarks.py --graph-tool build/graph_tool --output bench/results --seed 1 --devito-database data/devito.sqlite --allowed-names data/devito.allowed_names
+```
+
+Benchmarks write measured CSV/PNG outputs, machine specs, and fitted log-log slopes. Graph size studies use documented deterministic synthetic vectors; retrieval corpus results are synthetic and conversion measurements use the five supplied Fortran samples. No speedup claim is assumed.
+
+See [docs/formats.md](docs/formats.md) for TSV/JSON/sparse formats and [docs/EXPLAIN.md](docs/EXPLAIN.md) for a plain-English module walkthrough. Current phase status and limitations are in [PLAN.md](PLAN.md).

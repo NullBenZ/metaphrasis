@@ -14,3 +14,15 @@ For the C++ graph tool, edge-list endpoint IDs are zero-based vertex indices in 
 
 - `graph_tool --input vectors.sv --output graph.edges --k K --threads N [--mutual] [--dense]`
 - `graph_tool --mode leiden --input graph.edges --output communities.tsv --nodes N --resolution R --seed S`
+
+## Community assignments (`communities.tsv`)
+
+One row per indexed vector: `vector_row<TAB>community_id`. Vector row order is the lexicographic chunk-ID order used by the `.sv` exporter. Community IDs are consecutive integers for one graph run.
+
+## Numeric output (`result.txt`)
+
+For numeric validation, both executable programs write one finite array element per line using the same row-major iteration order. The harness rejects shape differences and uses configurable NumPy `allclose` tolerances.
+
+## Indexed API allow-list
+
+`--allowed-names PATH` writes one distinct identifier per line, sorted lexicographically. Names come from import symbols, call targets, and attribute names in the indexed Python repository. The AST validator checks Devito imports and attributes on objects constructed by those imports against this list. The allow-list is valid only for the exact indexed checkout recorded with it.

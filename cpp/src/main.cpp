@@ -27,7 +27,7 @@ int main(int argc,char** argv) {
         }
         if(input.empty()||output.empty()) throw std::runtime_error("--input and --output are required");
         if(mode=="topk") {auto rows=localgraph::read_vectors(input);auto edges=localgraph::make_topk(rows,k,mutual,dense,threads);localgraph::write_edges(output,edges);std::cout<<"nodes="<<rows.size()<<" edges="<<edges.size()<<"\n";}
-        else if(mode=="leiden") {auto edges=read_edges(input);localgraph::CSRGraph g(nodes,edges);auto c=localgraph::leiden(g,resolution,seed);std::ofstream out(output);if(!out)throw std::runtime_error("cannot write community file: "+output);for(std::size_t i=0;i<c.size();++i)out<<i<<'\t'<<c[i]<<'\n';std::cout<<"nodes="<<nodes<<" communities="<<(c.empty()?0:*std::max_element(c.begin(),c.end())+1)<<" modularity="<<localgraph::modularity(g,c,resolution)<<"\n";}
+        else if(mode=="leiden") {auto edges=read_edges(input);localgraph::CSRGraph g(nodes,edges);auto c=localgraph::leiden(g,resolution,seed);std::ofstream out(output);if(!out)throw std::runtime_error("cannot write community file: "+output);for(std::size_t i=0;i<c.size();++i)out<<i<<'\t'<<c[i]<<'\n';std::cout.precision(17);std::cout<<"nodes="<<nodes<<" communities="<<(c.empty()?0:*std::max_element(c.begin(),c.end())+1)<<" modularity="<<localgraph::modularity(g,c,resolution)<<"\n";}
         else throw std::runtime_error("--mode must be topk or leiden");
     } catch(const std::exception& e) { std::cerr<<"error: "<<e.what()<<'\n'; return 2; }
 }
