@@ -46,3 +46,5 @@ PYTHONPATH=python .venv/bin/python bench/run_benchmarks.py --graph-tool build/gr
 Benchmarks write measured CSV/PNG outputs, machine specs, and fitted log-log slopes. Graph size studies use documented deterministic synthetic vectors; retrieval corpus results are synthetic and conversion measurements use the five supplied Fortran samples. No speedup claim is assumed.
 
 See [docs/formats.md](docs/formats.md) for TSV/JSON/sparse formats and [docs/EXPLAIN.md](docs/EXPLAIN.md) for a plain-English module walkthrough. Current phase status and limitations are in [PLAN.md](PLAN.md).
+
+For a clean-machine copy-paste walkthrough, see [docs/HOW_TO_RUN.md](docs/HOW_TO_RUN.md). Unsupported inputs and unverified cases are listed in [docs/LIMITATIONS.md](docs/LIMITATIONS.md). Review draft query relevance interactively with `python -m metagraph.label_queries`; compute reviewed metrics with `python -m metagraph.eval_labels`.

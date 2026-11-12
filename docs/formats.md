@@ -26,3 +26,11 @@ For numeric validation, both executable programs write one finite array element 
 ## Indexed API allow-list
 
 `--allowed-names PATH` writes one distinct identifier per line, sorted lexicographically. Names come from import symbols, call targets, and attribute names in the indexed Python repository. The AST validator checks Devito imports and attributes on objects constructed by those imports against this list. The allow-list is valid only for the exact indexed checkout recorded with it.
+
+## Draft queries and reviewed labels (`queries*.jsonl`)
+
+Each query JSONL record has `query`, `source`, and `status`. Draft records use `status: "DRAFT"` and an empty `relevant` list; they are not evaluation labels. The interactive label helper writes one record per reviewed query with `status: "REVIEWED"`, `results` as the ranked chunk objects shown to the reviewer, and `relevant` as selected chunk IDs. `metagraph.eval_labels` computes metrics only from reviewed records with nonempty relevance judgments.
+
+## Generalization and benchmark CSVs
+
+Generalization results have one row per generated source variant with pattern, variant name, analysis/emission/validation status, and observed maximum absolute error when numeric comparison ran. Per-pattern pass-rate and mutation results are separate CSVs. Real Devito benchmark CSVs record graph/build/retrieval measurements, observed community statistics, and measured slopes; blank recall means labels were unavailable, not zero recall.

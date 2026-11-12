@@ -26,14 +26,19 @@ def _idiom(database, pattern):
 def _render(info, source):
     if info["status"] != "supported":
         raise ValueError(f"unsupported Fortran at {info['file']}:{info['line']}: {info['reason']}")
-    pattern=info["pattern"]; values=info["scalar_values"]; dims=info["array_bounds"]["u"]
+    pattern=info["pattern"]; values=info["scalar_values"]
+    stencil_arrays=[name for name,offsets in info["array_offsets"].items()
+                    if any(any(component != 0 for component in offset) for offset in offsets)]
+    if not stencil_arrays: raise ValueError("recognized stencil has no source array")
+    primary=stencil_arrays[0]
+    dims=info["array_bounds"][primary]
     if any(d["lower"] != 0 for d in dims): raise ValueError("only zero-based Fortran array bounds are supported")
     shape=tuple(d["size"] for d in dims)
     if any(d["size"] < 3 for d in dims): raise ValueError("grid needs at least one interior point")
     shape_arg=shape[0] if len(shape)==1 else shape
     spacing=[float(values.get(x,1.0)) for x in (["dx"] if len(shape)==1 else ["dx","dy"])]
     extent=tuple(spacing[i]*(shape[i]-1) for i in range(len(shape)))
-    init=float(info["array_initializers"].get("u",0)); points=info["array_points"]
+    init=float(info["array_initializers"].get(primary,0)); points=info["array_points"]
     nt=int(values[info["step_parameters"][0]]); dt=float(values.get("dt",1.0))
     code=f'''# Generated from {info['file']}:{info['line']}
 # Devito idiom source: {source}
@@ -45,7 +50,7 @@ extent = {extent!r}
 grid = Grid(shape=shape, extent=extent)
 '''
     def initialization(field, frame=0):
-        return f"{field}.data[:] = {init!r}\n"+''.join(f"{field}.data[{frame}, {', '.join(map(str,p['indices']))}] = {float(p['value'])!r}\n" for p in points if p['array']=='u')
+        return f"{field}.data[:] = {init!r}\n"+''.join(f"{field}.data[{frame}, {', '.join(map(str,p['indices']))}] = {float(p['value'])!r}\n" for p in points if p['array']==primary)
     if pattern in {"heat_1d","heat_2d"}:
         alpha=float(values.get("alpha",1.0)); derivative="u.dx2" if len(shape)==1 else "u.dx2 + u.dy2"
         code+=f'''nt = {nt}
@@ -95,7 +100,8 @@ for step in range(1, nt+1):
 np.savetxt('result.txt', u.data[nt+1, ...].ravel(order='F'))
 '''
     else:
-        h2=float(values["h2"]); finit=float(info["array_initializers"].get("f",0))
+        h2=float(values["h2"]); auxiliary=next((name for name in info["source_arrays"] if name != primary),"")
+        finit=float(info["array_initializers"].get(auxiliary,0))
         code+=f'''niter = {nt}
 h2 = {h2!r}
 u = Function(name="u", grid=grid, space_order=2)

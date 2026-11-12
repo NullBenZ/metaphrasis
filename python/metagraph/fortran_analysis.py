@@ -293,6 +293,8 @@ def analyze_fortran(path):
                          "indices":[":" if type(x).__name__=="Subscript_Triplet" else str(x) for x in _items_subscripts(blhs)]})
     if len({x["target"] for x in boundary})<2*len(vars_):
         return _failure(path,_line(stmt),"required explicit boundary assignments were not found for every spatial dimension")
+    if any(len(loop["bounds"]) != 2 for loop in active_loops):
+        return _failure(path,_line(stmt),"explicit loop strides are unsupported; only the default unit stride is recognized")
     loop_bounds={x["variable"]:x["bounds"] for x in active_loops}
     outer=[loop for loop in active_loops if loop["variable"] not in set(vars_)]
     step_parameters=sorted({b for x in outer for b in x["bounds"] if not b.isdigit()})
